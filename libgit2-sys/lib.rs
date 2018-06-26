@@ -25,6 +25,7 @@ pub const GIT_PROXY_OPTIONS_VERSION: c_uint = 1;
 pub const GIT_SUBMODULE_UPDATE_OPTIONS_VERSION: c_uint = 1;
 pub const GIT_ODB_BACKEND_VERSION: c_uint = 1;
 pub const GIT_REFDB_BACKEND_VERSION: c_uint = 1;
+pub const GIT_FILTER_VERSION: c_uint = 1;
 
 macro_rules! git_enum {
     (pub enum $name:ident { $($variants:tt)* }) => {
@@ -1498,6 +1499,32 @@ pub struct git_describe_format_options {
     pub dirty_suffix: *const c_char,
 }
 
+pub enum git_filter_source {}
+pub const GIT_FILTER_DRIVER_PRIORITY: c_int = 200;
+
+git_enum! {
+    pub enum git_filter_mode_t {
+        GIT_FILTER_TO_WORKTREE = 0,
+        GIT_FILTER_TO_ODB = 1,
+    }
+}
+
+#[repr(C)]
+pub struct git_filter {
+    pub version: c_uint,
+    pub attributes: *const c_char,
+    pub initialize: Option<extern fn(*mut git_filter) -> c_int>,
+    pub shutdown: Option<extern fn(*mut git_filter)>,
+    pub check: Option<extern fn(*mut git_filter, *mut *mut c_void,
+                         *const git_filter_source, *mut *const c_char) -> c_int>,
+    pub apply: Option<extern fn(*mut git_filter, *mut *mut c_void,
+                         *mut git_buf, *const git_buf, *const git_filter_source) -> c_int>,
+    pub stream: Option<extern fn(*mut *mut git_writestream, *mut git_filter,
+                         *mut *mut c_void, *const git_filter_source,
+                         *mut git_writestream) -> c_int>,
+    pub cleanup: Option<extern fn(*mut git_filter, *mut c_void)>,
+}
+
 git_enum! {
     pub enum git_packbuilder_stage_t {
         GIT_PACKBUILDER_ADDING_OBJECTS,
@@ -2799,6 +2826,14 @@ extern {
     pub fn git_describe_workdir(out: *mut *mut git_describe_result,
                                 repo: *mut git_repository,
                                 opts: *mut git_describe_options) -> c_int;
+
+    // filter
+    pub fn git_filter_register(name: *const c_char,
+                               filter: *mut git_filter,
+                               priority: c_int) -> c_int;
+    pub fn git_filter_unregister(name: *const c_char) -> c_int;
+    pub fn git_filter_source_mode(src: *const git_filter_source) -> git_filter_mode_t;
+    pub fn git_filter_source_path(src: *const git_filter_source) -> *const c_char;
 
     // message
     pub fn git_message_prettify(out: *mut git_buf,
